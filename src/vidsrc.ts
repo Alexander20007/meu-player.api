@@ -6,6 +6,7 @@ interface StreamResult {
   mediaId: string | null;
   stream: string | null;
   referer: string;
+  isM3U8: boolean;
 }
 
 async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number, episode?: number): Promise<StreamResult[]> {
@@ -26,24 +27,9 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
           ? `https://www.2embed.cc/embed/${tmdbId}`
           : `https://www.2embed.cc/embed/${tmdbId}?season=${season}&episode=${episode}`,
         referer: "https://www.2embed.cc"
-      },
-      {
-        name: "VidSrc (Net)",
-        url: (type === "movie") 
-          ? `https://vidsrc.net/embed/movie?tmdb=${tmdbId}`
-          : `https://vidsrc.net/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`,
-        referer: "https://vidsrc.net"
-      },
-      {
-        name: "Embed.su",
-        url: (type === "movie")
-          ? `https://embed.su/embed/movie/${tmdbId}`
-          : `https://embed.su/embed/tv/${tmdbId}/${season}/${episode}`,
-        referer: "https://embed.su"
       }
     ];
 
-    // Tentar cada provedor
     for (const provider of providers) {
       try {
         console.log(`🔍 Tentando: ${provider.name}`);
@@ -56,33 +42,52 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
         
         if (response.ok) {
           const html = await response.text();
+          const $ = cheerio.load(html);
           
-          // Extrair link
-          const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-          const videoMatch = html.match(/<video[^>]+src=["']([^"']+)["']/i);
-          const m3u8Match = html.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/i);
+          // 1. PROCURAR LINK .M3U8 DIRETO
+          let m3u8Link = null;
           
-          let stream = null;
-          if (iframeMatch) stream = iframeMatch[1];
-          else if (videoMatch) stream = videoMatch[1];
-          else if (m3u8Match) stream = m3u8Match[0];
-          
-          if (stream) {
-            // Se o stream for relativo, completar a URL
-            if (stream.startsWith('//')) {
-              stream = 'https:' + stream;
-            } else if (stream.startsWith('/')) {
-              stream = provider.referer + stream;
+          $('video source').each((i, el) => {
+            const src = $(el).attr('src');
+            if (src && src.includes('.m3u8')) {
+              m3u8Link = src;
             }
+          });
+          
+          if (!m3u8Link) {
+            const m3u8Match = html.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/i);
+            if (m3u8Match) {
+              m3u8Link = m3u8Match[0];
+            }
+          }
+          
+          if (m3u8Link) {
+            results.push({
+              name: provider.name + " (M3U8)",
+              image: null,
+              mediaId: tmdbId,
+              stream: m3u8Link,
+              referer: provider.referer,
+              isM3U8: true
+            });
+            console.log(`✅ ${provider.name} - Link .m3u8 encontrado!`);
+            continue;
+          }
+          
+          const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+          if (iframeMatch) {
+            let stream = iframeMatch[1];
+            if (stream.startsWith('//')) stream = 'https:' + stream;
             
             results.push({
-              name: provider.name,
+              name: provider.name + " (Iframe)",
               image: null,
               mediaId: tmdbId,
               stream: stream,
-              referer: provider.referer
+              referer: provider.referer,
+              isM3U8: false
             });
-            console.log(`✅ ${provider.name} funcionou!`);
+            console.log(`✅ ${provider.name} - Iframe encontrado`);
           }
         }
       } catch (error) {
@@ -90,10 +95,6 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
       }
     }
 
-    if (results.length === 0) {
-      console.log("⚠️ Nenhum provedor funcionou");
-    }
-    
     return results;
     
   } catch (error: any) {
