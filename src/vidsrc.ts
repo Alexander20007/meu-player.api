@@ -27,6 +27,20 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
           ? `https://www.2embed.cc/embed/${tmdbId}`
           : `https://www.2embed.cc/embed/${tmdbId}?season=${season}&episode=${episode}`,
         referer: "https://www.2embed.cc"
+      },
+      {
+        name: "VidEmbed",
+        url: (type === "movie")
+          ? `https://vidembed.cc/embed/${tmdbId}`
+          : `https://vidembed.cc/embed/${tmdbId}?season=${season}&episode=${episode}`,
+        referer: "https://vidembed.cc"
+      },
+      {
+        name: "Embed.su",
+        url: (type === "movie")
+          ? `https://embed.su/embed/movie/${tmdbId}`
+          : `https://embed.su/embed/tv/${tmdbId}/${season}/${episode}`,
+        referer: "https://embed.su"
       }
     ];
 
@@ -74,6 +88,7 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
             continue;
           }
           
+          // 2. SE NÃO ACHOU .M3U8, PEGA O IFRAME
           const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
           if (iframeMatch) {
             let stream = iframeMatch[1];
