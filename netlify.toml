@@ -3,3 +3,7 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[[functions]]
+  function = "canais"
+  path = "/api/canais"
