@@ -20,7 +20,11 @@ export const handler: Handler = async (event) => {
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify({ total: grupos.length, grupos })
+                body: JSON.stringify({ 
+                    success: true,
+                    total: grupos.length, 
+                    grupos 
+                })
             };
         }
         
