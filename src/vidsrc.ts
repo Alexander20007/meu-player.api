@@ -41,6 +41,21 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
           ? `https://embed.su/embed/movie/${tmdbId}`
           : `https://embed.su/embed/tv/${tmdbId}/${season}/${episode}`,
         referer: "https://embed.su"
+      },
+      // ===== NOVOS PROVEDORES =====
+      {
+        name: "MyEmbed",
+        url: (type === "movie")
+          ? `https://myembed.biz/embed/${tmdbId}`
+          : `https://myembed.biz/embed/${tmdbId}?season=${season}&episode=${episode}`,
+        referer: "https://myembed.biz"
+      },
+      {
+        name: "VidLink",
+        url: (type === "movie")
+          ? `https://vidlink.pro/movie/${tmdbId}`
+          : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`,
+        referer: "https://vidlink.pro"
       }
     ];
 
@@ -50,7 +65,10 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
         
         const response = await fetch(provider.url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': provider.referer
           }
         });
         
@@ -58,9 +76,10 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
           const html = await response.text();
           const $ = cheerio.load(html);
           
-          // 1. PROCURAR LINK .M3U8 DIRETO
+          // 1. PROCURAR LINK .M3U8 DIRETO (melhor opção)
           let m3u8Link = null;
           
+          // Buscar em sources do video
           $('video source').each((i, el) => {
             const src = $(el).attr('src');
             if (src && src.includes('.m3u8')) {
@@ -68,6 +87,7 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
             }
           });
           
+          // Buscar no HTML todo
           if (!m3u8Link) {
             const m3u8Match = html.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/i);
             if (m3u8Match) {
