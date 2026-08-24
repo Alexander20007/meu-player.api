@@ -1,21 +1,18 @@
-// API de canais - Busca os dados do Gist público
-// Fonte: https://gist.github.com/carlosmarineli/c626b982f47cede0ad12f3e5b6e9ed75
-
-const GIST_URL = 'https://gist.githubusercontent.com/carlosmarineli/c626b982f47cede0ad12f3e5b6e9ed75/raw/55630ddb141a0bc9008da0de04500b3d20d0e6c7/PLAYLIST';
+// API de canais - Busca os dados da lista CR7V
+const LISTA_URL = 'https://cr7v.short.gy/TV';
 
 let canaisCache: any[] | null = null;
 let ultimaAtualizacao = 0;
 const TEMPO_CACHE = 60000; // 60 segundos
 
 async function carregarCanais() {
-    // Verificar se o cache é válido
     if (canaisCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) {
         return canaisCache;
     }
 
     try {
-        console.log('🔄 Baixando lista de canais do Gist...');
-        const response = await fetch(GIST_URL);
+        console.log('🔄 Baixando lista de canais da CR7V...');
+        const response = await fetch(LISTA_URL);
         const texto = await response.text();
         const linhas = texto.split('\n');
 
@@ -45,13 +42,13 @@ async function carregarCanais() {
             }
         }
 
-        console.log(`✅ ${canais.length} canais carregados do Gist`);
+        console.log(`✅ ${canais.length} canais carregados da CR7V`);
         canaisCache = canais;
         ultimaAtualizacao = Date.now();
         return canais;
 
     } catch (error) {
-        console.error('❌ Erro ao carregar canais do Gist:', error);
+        console.error('❌ Erro ao carregar canais da CR7V:', error);
         return canaisCache || [];
     }
 }
