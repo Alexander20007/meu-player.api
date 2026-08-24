@@ -4,3 +4,20 @@ dist/
 .DS_Store
 *.log
 .netlify/
+
+# Arquivos grandes de canais - NUNCA SUBIR!
+*.m3u
+canais*.json
+playlist*.m3u
+extrair*.js
+test-canais.js
+test-canais.ts
+*.m3u8
+*.tsv
+*.csv
+*.sqlite
+*.db
+*.mp4
+*.mkv
+*.avi
+*.torrent
