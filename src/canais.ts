@@ -1,18 +1,39 @@
-// API de canais - Busca os dados da lista CR7V
-const LISTA_URL = 'https://cr7v.short.gy/TV';
+const SUPABASE_URL = 'https://dpdxceorevfudhnrmulo.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
 
 let canaisCache: any[] | null = null;
 let ultimaAtualizacao = 0;
-const TEMPO_CACHE = 60000; // 60 segundos
+const TEMPO_CACHE = 60000;
 
-async function carregarCanais() {
-    if (canaisCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) {
-        return canaisCache;
-    }
-
+async function buscarUrlLista(): Promise<string | null> {
     try {
-        console.log('🔄 Baixando lista de canais da CR7V...');
-        const response = await fetch(LISTA_URL);
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/config?chave=eq.canais_url&select=valor`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+
+        if (!response.ok) {
+            console.error('❌ Erro ao buscar URL:', response.status);
+            return null;
+        }
+
+        const data = await response.json();
+        if (data && data.length > 0) {
+            return data[0].valor;
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Erro ao conectar ao Supabase:', error);
+        return null;
+    }
+}
+
+async function baixarEProcessarLista(url: string) {
+    try {
+        console.log('🔄 Baixando lista de canais...');
+        const response = await fetch(url);
         const texto = await response.text();
         const linhas = texto.split('\n');
 
@@ -42,15 +63,33 @@ async function carregarCanais() {
             }
         }
 
-        console.log(`✅ ${canais.length} canais carregados da CR7V`);
+        console.log(`✅ ${canais.length} canais carregados`);
         canaisCache = canais;
         ultimaAtualizacao = Date.now();
         return canais;
 
     } catch (error) {
-        console.error('❌ Erro ao carregar canais da CR7V:', error);
+        console.error('❌ Erro ao baixar lista:', error);
         return canaisCache || [];
     }
+}
+
+async function carregarCanais() {
+    if (canaisCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) {
+        return canaisCache;
+    }
+
+    const urlLista = await buscarUrlLista();
+    
+    if (!urlLista) {
+        console.log('⚠️ URL da lista não encontrada no Supabase');
+        const FALLBACK_URL = 'https://cr7v.short.gy/TV';
+        console.log(`🔄 Usando fallback: ${FALLBACK_URL}`);
+        return await baixarEProcessarLista(FALLBACK_URL);
+    }
+
+    console.log(`📡 URL da lista obtida do Supabase: ${urlLista}`);
+    return await baixarEProcessarLista(urlLista);
 }
 
 export async function buscarCanais(query?: string, grupo?: string, limit?: number) {
