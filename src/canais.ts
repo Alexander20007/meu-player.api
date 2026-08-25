@@ -24,8 +24,8 @@ async function buscarUrlLista(): Promise<string | null> {
             return data[0].valor;
         }
         return null;
-    } catch (error) {
-        console.error('❌ Erro ao conectar ao Supabase:', error);
+    } catch (error: any) {
+        console.error('❌ Erro ao conectar ao Supabase:', error.message);
         return null;
     }
 }
@@ -68,8 +68,8 @@ async function baixarEProcessarLista(url: string) {
         ultimaAtualizacao = Date.now();
         return canais;
 
-    } catch (error) {
-        console.error('❌ Erro ao baixar lista:', error);
+    } catch (error: any) {
+        console.error('❌ Erro ao baixar lista:', error.message);
         return canaisCache || [];
     }
 }

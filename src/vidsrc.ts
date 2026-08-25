@@ -40,8 +40,8 @@ async function buscarProvedores(): Promise<any[]> {
         ultimaAtualizacao = Date.now();
         return data;
 
-    } catch (error) {
-        console.error('❌ Erro ao conectar ao Supabase:', error);
+    } catch (error: any) {
+        console.error('❌ Erro ao conectar ao Supabase:', error.message);
         return provedoresCache || [];
     }
 }
@@ -135,7 +135,7 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
                         console.log(`✅ ${provider.nome} - Iframe encontrado`);
                     }
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.log(`❌ ${provider.nome} falhou:`, error.message);
             }
         }
