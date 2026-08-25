@@ -1,5 +1,8 @@
-const SUPABASE_URL = 'https://dpdxceorevfudhnrmulo.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
+// ============================================
+// VARIÁVEIS DO SUPABASE (NOMES CORRETOS: SB_URL e SB_ANON_KEY)
+// ============================================
+const SUPABASE_URL = Deno.env.get('SB_URL') || 'https://dpdxceorevfudhnrmulo.supabase.co';
+const SUPABASE_ANON_KEY = Deno.env.get('SB_ANON_KEY') || 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
 
 let canaisCache: any[] | null = null;
 let ultimaAtualizacao = 0;
