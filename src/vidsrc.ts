@@ -18,13 +18,16 @@ interface StreamResult {
 
 async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number, episode?: number): Promise<StreamResult[]> {
     try {
-        // Monta a URL da Edge Function
+        // Monta a URL da Edge Function (APENAS COM ID E TYPE)
         let url = `${EDGE_FUNCTION_URL}?tmdbId=${tmdbId}&type=${type}`;
         
-        // Se for série, adiciona season e episode
-        if (type === 'tv' && season && episode) {
-            url += `&season=${season}&episode=${episode}`;
-        }
+        // ============================================
+        // SÉRIES: NÃO PRECISA DE TEMPORADA E EPISÓDIO
+        // O player do provedor já tem essa opção
+        // ============================================
+        // if (type === 'tv' && season && episode) {
+        //     url += `&season=${season}&episode=${episode}`;
+        // }
 
         console.log(`📤 Chamando Edge Function: ${url}`);
 
@@ -33,7 +36,6 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
 
         console.log(`📥 Resposta da Edge Function: ${JSON.stringify(data)}`);
 
-        // A Edge Function já retorna no formato que precisamos
         return data;
 
     } catch (error: any) {
