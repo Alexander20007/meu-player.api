@@ -1,12 +1,9 @@
-// ============================================
-// API DE FILMES/SÉRIES - BUSCA PROVEDORES DO SUPABASE
-// ============================================
-
 import * as cheerio from "cheerio";
+import { extrairComPuppeteer } from './extratores/puppeteer.js';
+import { extrairComPlaywright } from './extratores/playwright.js';
 
-// Configuração do Supabase
-const SUPABASE_URL = 'https://dpdxceorevfudhnrmulo.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
+const SUPABASE_URL = process.env.SB_URL || 'https://dpdxceorevfudhnrmulo.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SB_ANON_KEY || 'sb_publishable_7Ccv9D3N097xwrqjuJQ7CA_kiFWbxH6';
 
 interface StreamResult {
   name: string | null;
@@ -17,14 +14,10 @@ interface StreamResult {
   isM3U8: boolean;
 }
 
-// Cache para provedores
 let provedoresCache: any[] | null = null;
 let ultimaAtualizacao = 0;
-const TEMPO_CACHE = 60000; // 60 segundos
+const TEMPO_CACHE = 60000;
 
-// ============================================
-// 1. BUSCAR PROVEDORES DO SUPABASE
-// ============================================
 async function buscarProvedores(): Promise<any[]> {
     if (provedoresCache && (Date.now() - ultimaAtualizacao) < TEMPO_CACHE) {
         return provedoresCache;
@@ -56,13 +49,76 @@ async function buscarProvedores(): Promise<any[]> {
 }
 
 // ============================================
-// 2. FUNÇÃO PRINCIPAL (FILMES/SÉRIES)
+// FUNÇÃO PARA TENTAR EXTRAIR .M3U8 COM VÁRIOS MÉTODOS
+// ============================================
+async function extrairM3U8(url: string, providerName: string): Promise<string | null> {
+    console.log(`🔍 Tentando extrair .m3u8 de ${providerName}...`);
+
+    // 1. Método 1: Cheerio (rápido, já existente)
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': url.split('/')[0] + '//' + url.split('/')[2]
+            }
+        });
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        
+        let m3u8Link = null;
+        $('video source').each((i, el) => {
+            const src = $(el).attr('src');
+            if (src && src.includes('.m3u8')) {
+                m3u8Link = src;
+            }
+        });
+        if (!m3u8Link) {
+            const m3u8Match = html.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/i);
+            if (m3u8Match) {
+                m3u8Link = m3u8Match[0];
+            }
+        }
+        if (m3u8Link) {
+            console.log(`✅ Cheerio encontrou .m3u8 em ${providerName}`);
+            return m3u8Link;
+        }
+    } catch (error) {
+        console.log(`⚠️ Cheerio falhou para ${providerName}:`, error.message);
+    }
+
+    // 2. Método 2: Puppeteer (executa JavaScript)
+    try {
+        const m3u8 = await extrairComPuppeteer(url);
+        if (m3u8) {
+            console.log(`✅ Puppeteer encontrou .m3u8 em ${providerName}`);
+            return m3u8;
+        }
+    } catch (error) {
+        console.log(`⚠️ Puppeteer falhou para ${providerName}:`, error.message);
+    }
+
+    // 3. Método 3: Playwright (fallback)
+    try {
+        const m3u8 = await extrairComPlaywright(url);
+        if (m3u8) {
+            console.log(`✅ Playwright encontrou .m3u8 em ${providerName}`);
+            return m3u8;
+        }
+    } catch (error) {
+        console.log(`⚠️ Playwright falhou para ${providerName}:`, error.message);
+    }
+
+    console.log(`❌ Nenhum extrator encontrou .m3u8 para ${providerName}`);
+    return null;
+}
+
+// ============================================
+// FUNÇÃO PRINCIPAL
 // ============================================
 async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number, episode?: number): Promise<StreamResult[]> {
     try {
         const results: StreamResult[] = [];
         
-        // Buscar provedores do Supabase
         const provedores = await buscarProvedores();
         
         if (provedores.length === 0) {
@@ -70,7 +126,6 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
             return [];
         }
 
-        // Filtrar por tipo (Filmes ou Séries)
         const tipoBusca = type === 'movie' ? 'Filmes' : 'Séries';
         const provedoresFiltrados = provedores.filter(p => p.nome.includes(tipoBusca));
 
@@ -83,17 +138,37 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
 
         for (const provider of provedoresFiltrados) {
             try {
-                // Monta a URL
                 let urlProvedor = provider.url_template
                     .replace(/\{id\}/g, tmdbId)
                     .replace(/\{type\}/g, type);
 
                 if (type === 'tv' && season && episode) {
-                    urlProvedor += `&season=${season}&episode=${episode}`;
+                    urlProvedor += `?season=${season}&episode=${episode}`;
                 }
 
                 console.log(`🔍 Tentando: ${provider.nome}`);
 
+                // ============================================
+                // TENTAR EXTRAIR .M3U8 COM OS EXTRATORES
+                // ============================================
+                const m3u8Link = await extrairM3U8(urlProvedor, provider.nome);
+
+                if (m3u8Link) {
+                    results.push({
+                        name: provider.nome + " (M3U8)",
+                        image: null,
+                        mediaId: tmdbId,
+                        stream: m3u8Link,
+                        referer: provider.referer,
+                        isM3U8: true
+                    });
+                    console.log(`✅ ${provider.nome} - Link .m3u8 encontrado!`);
+                    continue;
+                }
+
+                // ============================================
+                // FALLBACK: SE NÃO ACHOU .M3U8, TENTA IFRAME
+                // ============================================
                 const response = await fetch(urlProvedor, {
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -104,35 +179,6 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
                 if (response.ok) {
                     const html = await response.text();
                     const $ = cheerio.load(html);
-                    
-                    let m3u8Link = null;
-                    
-                    $('video source').each((i, el) => {
-                        const src = $(el).attr('src');
-                        if (src && src.includes('.m3u8')) {
-                            m3u8Link = src;
-                        }
-                    });
-                    
-                    if (!m3u8Link) {
-                        const m3u8Match = html.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/i);
-                        if (m3u8Match) {
-                            m3u8Link = m3u8Match[0];
-                        }
-                    }
-                    
-                    if (m3u8Link) {
-                        results.push({
-                            name: provider.nome + " (M3U8)",
-                            image: null,
-                            mediaId: tmdbId,
-                            stream: m3u8Link,
-                            referer: provider.referer,
-                            isM3U8: true
-                        });
-                        console.log(`✅ ${provider.nome} - Link .m3u8 encontrado!`);
-                        continue;
-                    }
                     
                     const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
                     if (iframeMatch) {
@@ -147,7 +193,7 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
                             referer: provider.referer,
                             isM3U8: false
                         });
-                        console.log(`✅ ${provider.nome} - Iframe encontrado`);
+                        console.log(`✅ ${provider.nome} - Iframe encontrado (fallback)`);
                     }
                 }
             } catch (error: any) {
